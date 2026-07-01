@@ -2,10 +2,13 @@ import DefaultTheme from 'vitepress/theme'
 import { onMounted, watch, nextTick } from 'vue'
 import type { EnhanceAppContext } from 'vitepress'
 import './custom.css'
+import PostsList from './PostsList.vue'
 
 export default {
   extends: DefaultTheme,
-  enhanceApp({ router }: EnhanceAppContext) {
+  enhanceApp({ app, router }: EnhanceAppContext) {
+    app.component('PostsList', PostsList)
+
     if (typeof document === 'undefined') return
 
     let btn: HTMLButtonElement | null = null
