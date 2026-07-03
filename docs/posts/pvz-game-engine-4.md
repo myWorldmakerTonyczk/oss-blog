@@ -296,6 +296,131 @@ C → check loaders → 有 → 复用 A 的 Promise
 - 加载进度回调
 - 资源优先级队列（先加载关键资源）
 
+### Promise 进阶答疑
+
+写 ResourceManager 时遇到不少 Promise 相关的问题，一并记录在这里。
+
+#### resolve 和 reject 是什么
+
+```js
+new Promise((resolve, reject) => {
+    // resolve = "搞定了，结果在这"
+    // reject  = "出错了，原因在这"
+});
+```
+
+这两个名字只是约定俗成，本质上是 `new Promise` 传给你的两个函数参数——第一个是成功回调，第二个是失败回调。你决定什么时候调谁。
+
+#### img.onload 和 img.onerror
+
+```js
+const img = new Image();
+img.onload  = () => resolve(img);  // 下载成功 → 调 resolve 交出 img
+img.onerror = reject;              // 下载失败 → 调 reject 报告错误
+img.src = 'player.png';           // 最后才触发下载
+```
+
+`img.src` 必须写在最后：一旦赋值，浏览器立刻开始下载。如果图片很小或者在缓存里，可能瞬间就下载完了——此时 `onload` 还没绑定，事件就错过了。先绑监听，再放老鼠。
+
+#### 为什么 loadJSON 结构和 loadImage 不一样
+
+`loadImage` 用 `new Promise` 手动包装，因为 `new Image()` 是事件驱动的，不返回 Promise。
+
+`loadJSON` 用 `async/await`，因为 `fetch()` 本身就返回 Promise，不需要手动包装。
+
+两种写法殊途同归——都返回 Promise：
+
+```js
+function loadImage(src) {
+    return new Promise((resolve, reject) => {  // fetch/audio 同理
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+    });
+}
+
+async function loadJSON(src) {
+    const res = await fetch(src);          // fetch 返回 Promise，await 等它完成
+    if (!res.ok) throw new Error(...);     // async 里 throw = reject
+    return res.json();                     // async 里 return = resolve
+}
+```
+
+#### Promise 是什么——它叫"承诺"不是"结果"
+
+```js
+const promise = loadJSON('data.json');
+console.log(promise);  // Promise { <pending> } ← 还没结果！
+```
+
+调用 `loadJSON` 时，函数里 `await fetch` 让函数暂停了，立刻返回一个 pending 的 Promise。这个 Promise 是"承诺"——"我现在没有结果，但我保证未来会有"。等 fetch 完成，Promise 从 pending 变成 fulfilled，值就在里面了。
+
+**Promise 会变，但只变一次：**
+
+```text
+pending ──成功──→ fulfilled（拿到值，永久冻结）
+       ──失败──→ rejected（拿到错误，永久冻结）
+```
+
+后续再 `await` 同一个 Promise，缓存直接返回同一个结果，不会重新触发下载。
+
+#### `.then()` 里的代码不是立刻执行的
+
+```js
+promise = promise.then(res => {
+    cache.set(path, res);      // ← 图片下载完才跑
+    loaders.delete(path);      // ← 图片下载完才跑
+});
+
+loaders.set(path, promise);    // ← 现在立刻跑（标记"加载中"）
+return promise;                // ← 现在立刻返回（pending Promise）
+```
+
+`.then()` 注册的是一个"等完成了再跑"的回调。所以先 `loaders.set`（立刻标记生产线上有这个资源），后 `loaders.delete`（下载完了才从生产线移除）。两个操作隔着整个下载过程。
+
+#### 为什么 cache 命中了还要用 Promise.resolve 包一层
+
+```js
+export function load(path) {
+    if (cache.has(path)) return Promise.resolve(cache.get(path));
+    return loadOne(path);
+}
+```
+
+保证返回值类型一致——`load` **永远返回 Promise**。调用方永远 `await`，不用管这次到底走了缓存还是走了下载：
+
+```js
+const img = await load('player.png');  // 第一次等 200ms，第二次 0ms 立刻到
+```
+
+#### 怎么从 Promise 里取值
+
+两种方式等价：
+
+```js
+// 方式 1：await（只能在 async 函数里用）
+const img = await load('player.png');
+ctx.drawImage(img, 0, 0);
+
+// 方式 2：.then()
+load('player.png').then(img => {
+    ctx.drawImage(img, 0, 0);
+});
+```
+
+`await` 就是 `.then()` 的语法糖，把 `resolve(值)` 塞进去的那个值掏出来给你。
+
+#### isCached 的必要性
+
+```js
+export function isCached(path) {
+    return cache.has(path);
+}
+```
+
+和 `get` 不同：`get` 没缓存会 `console.warn` 并返回 null，`isCached` 只是悄悄问一句"加载好了没"，不触发警告，不尝试加载。纯查询工具，用于加载界面判断是否能进入游戏。
+
 ## 当前项目结构
 
 ```
