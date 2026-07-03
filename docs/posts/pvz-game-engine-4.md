@@ -130,90 +130,158 @@ onExit(GameState.PLAYING, ...)  // ← 直接报 ReferenceError
 
 ## 资源管理器
 
-### 问题
+### 资源系统在解决什么问题
 
-游戏需要图片、音频、JSON 数据。如果不管理会出现：
-- 同一张图片被多个实体重复加载（浪费网络）
-- 加载状态混乱，不知道哪些已加载、哪些还在等
-- 异步顺序无法控制
+在游戏里会不断用到图片（player.png）、音频（bgm.mp3）、数据（level.json）。
 
-### 核心设计：cache + loaders
+如果不管理会出现：
+
+- 同一资源重复加载（浪费网络）
+- 多个模块重复创建 Image / Audio
+- 加载状态混乱
+- 无法控制异步顺序
+
+所以资源管理器的目标是：**同一个资源只加载一次、所有人共享加载结果、支持异步加载、支持缓存复用**。
+
+### 核心结构设计
 
 ```js
-const cache = new Map();   // key → 已加载的资源对象（Image/Audio/JSON）
-const loaders = new Map(); // key → 正在加载中的 Promise（防重复）
+const cache = new Map();   // 已加载完成的资源
+const loaders = new Map(); // 正在加载中的 Promise
 ```
+
+### 两个核心状态
+
+**cache（成品仓库）**：key → 资源对象（Image / Audio / JSON）。已经加载完成，可直接使用，永久缓存（除非 clear）。
+
+**loaders（生产流水线）**：key → Promise。表示"正在加载"，防止重复请求，多个请求共享同一个 Promise。
+
+### 资源生命周期（核心状态机）
 
 一个资源只有三种状态：
 
-```text
-① 未加载        cache ❌  loaders ❌
-② 加载中        cache ❌  loaders ✔
-③ 已加载        cache ✔   loaders ❌
-```
+| 状态 | cache | loaders |
+|------|-------|---------|
+| 未加载 | ❌ | ❌ |
+| 加载中 | ❌ | ✔ |
+| 已加载 | ✔ | ❌ |
 
-### 四个方法
+### 完整调用链
+
+假设调用 `load("player.png")`：
+
+**STEP 1：进入 load()**
 
 ```js
-// 1️⃣ 加载单个资源（自动去重）
 export function load(path) {
-    if (cache.has(path)) return Promise.resolve(cache.get(path));  // 已缓存，直接返回
-    if (loaders.has(path)) return loaders.get(path);                // 加载中，复用 Promise
-    return loadOne(path);                                           // 第一次，开始加载
+    if (cache.has(path)) return Promise.resolve(cache.get(path));  // cache 有 → 直接返回
+    if (loaders.has(path)) return loaders.get(path);                // loaders 有 → 复用 Promise
+    return loadOne(path);                                           // 都没有 → 开始加载
 }
+```
 
-// 真正的加载逻辑：按后缀选 Image / Audio / JSON 加载器
+**STEP 2：进入 loadOne（真正执行加载）**
+
+做三件事：
+
+```js
 function loadOne(path) {
+    // 1️⃣ 创建加载任务（按后缀选 Image/Audio/JSON 加载器）
     let promise;
-    if (path.endsWith('.png')) promise = loadImage(path);
-    // ... audio、json 同理
+    if (path.endsWith('.png') || path.endsWith('.jpg')) promise = loadImage(path);
+    else if (path.endsWith('.mp3') || path.endsWith('.wav')) promise = loadAudio(path);
+    else if (path.endsWith('.json')) promise = loadJSON(path);
 
+    // 2️⃣ 写入 loaders（关键："这个资源正在加载中"）
+    loaders.set(path, promise);
+
+    // 3️⃣ 绑定完成逻辑
     promise = promise.then(res => {
-        cache.set(path, res);     // 加载完 → 放入缓存
-        loaders.delete(path);     // 移除加载中状态
+        cache.set(path, res);    // 放入缓存
+        loaders.delete(path);    // 移除加载状态
         return res;
     });
 
-    loaders.set(path, promise);   // 标记"正在加载"
     return promise;
 }
+```
 
-// 3️⃣ 获取缓存（同步，不等待）
-export function get(path) {
-    if (!cache.has(path)) {
-        console.warn(`资源未加载: ${path}`);
-        return null;
-    }
-    return cache.get(path);
-}
+**get 和 load 的区别**
 
-// 4️⃣ 预加载：启动时一次性加载所有资源
-export async function preload(paths) {
-    return Promise.all(paths.map(p => loadOne(p)));
+| | load(path) | get(path) |
+|---|-----------|----------|
+| 干嘛 | 去加载资源 | 取缓存资源 |
+| 返回 | Promise（异步） | 资源对象（同步） |
+| 在哪用 | 加载界面 | render / update 里 |
+
+```js
+// START 时：去加载
+await preload(['zombie.png']);   // 等网络下载完
+
+// 游戏里：直接拿
+render(ctx) {
+    ctx.drawImage(get('zombie.png'), this.x, this.y);  // 立刻拿到，不等待
 }
+```
+
+### 真正的异步流程（时间线）
+
+```text
+load("player.png")
+        ↓
+检查 cache（没有）
+        ↓
+检查 loaders（没有）
+        ↓
+进入 loadOne
+        ↓
+创建 Promise（开始下载图片）
+        ↓
+loaders 记录"加载中状态"
+        ↓
+浏览器下载图片
+        ↓
+img.onload 触发
+        ↓
+resolve(img)
+        ↓
+promise.then 执行
+        ↓
+cache.set(img)  +  loaders.delete(path)
+        ↓
+返回 img
 ```
 
 ### 为什么 loaders 必须存在
 
-没有 loaders 的情况下，三个系统同时请求同一张图片——三次网络请求。
+如果没有 loaders：
 
-有 loaders：A 创建 Promise 写入 loaders，B 和 C 发现自己也在请求同一个 key，直接复用 A 的 Promise。一次网络请求，三个系统共享结果。
-
-### Promise 是什么
-
-图片加载需要网络请求——不能同步等待，不然游戏卡死。Promise 是 JS 的异步标准：
-
-```js
-// START 时：去加载，返回 Promise
-await preload(['zombie.png']);  // 等待网络下载完成
-
-// 游戏里：同步取缓存，不等待
-render(ctx) {
-    ctx.drawImage(get('zombie.png'), this.x, this.y);
-}
+```text
+A 请求 player.png → load（开始加载）
+B 请求 player.png → load（又开一个加载，重复！）
+C 请求 player.png → load（又开一个，重复！）
 ```
 
-预加载时用 `await` 等它完成，游戏运行时 `get` 直接从内存拿——不等待。
+❌ 三次网络请求。
+
+有 loaders：
+
+```text
+A → 创建 Promise，写入 loaders
+B → check loaders → 有 → 复用 A 的 Promise
+C → check loaders → 有 → 复用 A 的 Promise
+```
+
+✔ 一次网络请求，全局共享。
+
+### cache 和 loaders 的本质区别
+
+| | cache | loaders |
+|---|------|---------|
+| 存什么 | 资源对象 | Promise |
+| 状态 | 已完成 | 加载中 |
+| 是否可用 | ✔ 直接用 | ❌ 等待 |
+| 生命周期 | 长期 | 临时 |
 
 ### 一句话总结
 
@@ -226,6 +294,7 @@ render(ctx) {
 - 分包加载（按关卡拆分资源包）
 - SpriteSheet 支持（配合动画系统）
 - 加载进度回调
+- 资源优先级队列（先加载关键资源）
 
 ## 当前项目结构
 
