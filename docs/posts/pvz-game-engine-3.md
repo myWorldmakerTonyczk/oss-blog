@@ -1,10 +1,10 @@
 ---
-title: 从零搭建PVZ游戏引擎（三）——importmap、架构解耦、Overlay贴片与鼠标输入
+title: 从零搭建PVZ游戏引擎（三）——importmap、架构解耦、鼠标输入、Overlay贴片与碰撞扣血
 date: 2026-07-03
 author: myWorldmakerTonyczk
 ---
 
-# 从零搭建PVZ游戏引擎（三）——importmap、架构解耦、Overlay贴片与鼠标输入
+# 从零搭建PVZ游戏引擎（三）——importmap、架构解耦、鼠标输入、Overlay贴片与碰撞扣血
 
 > GitHub 仓库：[https://github.com/myWorldmakerTonyczk/gamePVZ](https://github.com/myWorldmakerTonyczk/gamePVZ)
 
