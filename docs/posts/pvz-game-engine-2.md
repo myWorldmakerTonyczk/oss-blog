@@ -22,7 +22,7 @@ export class Entity {
 ```
 
 Scene 是容器，管着所有实体，每帧遍历：
-
+ 
 ```javascript
 export class Scene {
     entities = [];
