@@ -6,6 +6,8 @@ author: myWorldmakerTonyczk
 
 # 从零搭建PVZ游戏引擎（一）——状态机与主循环
 
+> GitHub 仓库：[https://github.com/myWorldmakerTonyczk/gamePVZ](https://github.com/myWorldmakerTonyczk/gamePVZ)
+
 作为课程大作业，小组选择了**植物大战僵尸（Plants vs Zombies）Web 版**。技术栈 HTML5 Canvas + JavaScript，无框架手写引擎。我负责 `Service/core/` 下的核心引擎。这篇文章记录第一天搭骨架的过程。
 
 ## 一个游戏引擎最少需要什么？

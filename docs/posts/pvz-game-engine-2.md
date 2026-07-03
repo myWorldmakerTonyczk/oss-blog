@@ -6,6 +6,8 @@ author: myWorldmakerTonyczk
 
 # 从零搭建PVZ游戏引擎（二）——Entity/Scene、Input 与 EventBus
 
+> GitHub 仓库：[https://github.com/myWorldmakerTonyczk/gamePVZ](https://github.com/myWorldmakerTonyczk/gamePVZ)
+
 [上一篇](/posts/pvz-game-engine-1) 搭好了状态机 + 主循环骨架。有了心跳，接下来要让东西出现在画面上，并且能交互。
 
 ## Entity 基类 + Scene 容器
@@ -78,6 +80,12 @@ const KEY_MAP = {
 解决方案：发布-订阅模式。各模块只依赖 EventBus，通过事件通信。僵尸死亡时发事件，经济系统听到后加阳光，两者零耦合。
 
 ## 遇到的问题
+
+### 直接双击 HTML 打不开？
+
+写完入口文件，双击 `index.html`，浏览器白屏，控制台报 `CORS policy` 错误。原因是 `<script type="module">` 使用 ES Module，浏览器安全策略禁止 `file://` 协议加载模块——必须有 HTTP 服务器。
+
+解决：VS Code 装 **Live Server** 插件，右键 `index.html` → "Open with Live Server"，自动启动本地 HTTP 服务，一切正常。
 
 ### Canvas 谁来管？
 
