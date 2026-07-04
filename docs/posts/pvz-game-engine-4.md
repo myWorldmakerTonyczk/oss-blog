@@ -262,7 +262,7 @@ B 请求 player.png → load（又开一个加载，重复！）
 C 请求 player.png → load（又开一个，重复！）
 ```
 
-❌ 三次网络请求。
+❌ 三次网络请求。 
 
 有 loaders：
 
