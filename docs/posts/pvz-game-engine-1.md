@@ -2,6 +2,8 @@
 title: 从零搭建PVZ游戏引擎（一）——状态机与主循环
 date: 2026-07-02
 author: myWorldmakerTonyczk
+series: 从零搭建PVZ游戏引擎
+seriesOrder: 1
 ---
 
 # 从零搭建PVZ游戏引擎（一）——状态机与主循环

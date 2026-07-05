@@ -2,6 +2,8 @@
 title: 从零搭建PVZ游戏引擎（三）——importmap、架构解耦、鼠标输入、Overlay贴片与碰撞扣血
 date: 2026-07-03
 author: myWorldmakerTonyczk
+series: 从零搭建PVZ游戏引擎
+seriesOrder: 3
 ---
 
 # 从零搭建PVZ游戏引擎（三）——importmap、架构解耦、鼠标输入、Overlay贴片与碰撞扣血

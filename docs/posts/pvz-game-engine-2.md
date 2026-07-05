@@ -2,6 +2,8 @@
 title: 从零搭建PVZ游戏引擎（二）——Entity/Scene、Input 与 EventBus
 date: 2026-07-02
 author: myWorldmakerTonyczk
+series: 从零搭建PVZ游戏引擎
+seriesOrder: 2
 ---
 
 # 从零搭建PVZ游戏引擎（二）——Entity/Scene、Input 与 EventBus

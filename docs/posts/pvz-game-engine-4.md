@@ -2,6 +2,8 @@
 title: 从零搭建PVZ游戏引擎（四）——START界面、System生命周期与资源管理器
 date: 2026-07-03
 author: myWorldmakerTonyczk
+series: 从零搭建PVZ游戏引擎
+seriesOrder: 4
 ---
 
 # 从零搭建PVZ游戏引擎（四）——START界面、System生命周期与资源管理器

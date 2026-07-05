@@ -6,6 +6,8 @@ export interface Post {
   author: string
   url: string
   excerpt: string
+  series?: string
+  seriesOrder?: number
 }
 
 function stripHtml(html: string): string {
@@ -46,6 +48,8 @@ export default createContentLoader('posts/*.md', {
           author: page.frontmatter.author || '',
           url: page.url,
           excerpt,
+          series: page.frontmatter.series || undefined,
+          seriesOrder: page.frontmatter.seriesOrder ? Number(page.frontmatter.seriesOrder) : undefined,
         }
       })
   }

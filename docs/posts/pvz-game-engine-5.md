@@ -2,6 +2,8 @@
 title: 从零搭建PVZ游戏引擎（五）——LOADING状态、资源管线完善、僵尸实体与动画系统
 date: 2026-07-04
 author: myWorldmakerTonyczk
+series: 从零搭建PVZ游戏引擎
+seriesOrder: 5
 ---
 
 # 从零搭建PVZ游戏引擎（五）——LOADING状态、资源管线完善、僵尸实体与动画系统
