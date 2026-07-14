@@ -51,13 +51,18 @@ export default defineConfig({
         const { series, standalone } = getPosts()
         const items: any[] = []
 
-        // 合集作为可折叠分组
-        if (series.length) {
-          const seriesTitle = series[0].series || 'Series'
+        // 按 series 字段分组，每个合集一个折叠分组
+        const seriesGroups = new Map<string, PostMeta[]>()
+        for (const p of series) {
+          const name = p.series!
+          if (!seriesGroups.has(name)) seriesGroups.set(name, [])
+          seriesGroups.get(name)!.push(p)
+        }
+        for (const [seriesName, seriesPosts] of seriesGroups) {
           items.push({
-            text: seriesTitle,
+            text: seriesName,
             collapsed: false,
-            items: series.map(p => ({ text: p.text, link: p.link })),
+            items: seriesPosts.map(p => ({ text: p.text, link: p.link })),
           })
         }
         // 非合集帖子
