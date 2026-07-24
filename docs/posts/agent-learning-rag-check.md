@@ -136,6 +136,7 @@ seriesOrder: 21
 ---
 
 **上一篇：**[Agent 学习（二十）——上下文管理与 RAG 前的检查](/posts/agent-learning-context-management)
+**下一篇：**[Agent 学习（二十二）——Embedding 与 RAG 原理](/posts/agent-learning-embedding)
 
 ---
 

@@ -13,16 +13,22 @@ interface Post {
   seriesOrder?: number
 }
 
+interface StageGroup {
+  name: string
+  posts: Post[]
+}
+
 interface Collection {
   title: string
   posts: Post[]
+  stages: StageGroup[]
   latestDate: string
 }
 
 const posts = data as Post[]
 
-// 合集默认显示前 4 篇，可展开
-const COLLECTION_PREVIEW = 4
+// 合集默认折叠显示前 6 篇，点击展开全部
+const PREVIEW_COUNT = 6
 const expandedSet = ref<Record<string, boolean>>({})
 
 function toggleExpand(title: string) {
@@ -32,7 +38,15 @@ function isExpanded(title: string) {
   return !!expandedSet.value[title]
 }
 
-// 按 series 分组：有 series 的归入合集，没有的作为单帖
+// 根据 seriesOrder 划分阶段
+function getStage(order: number): string {
+  if (order <= 18) return '第一阶段：Agent Core'
+  if (order <= 22) return '第二阶段：Memory & Knowledge'
+  if (order <= 28) return '第三阶段：Infrastructure'
+  return '第四阶段：Multi-Agent'
+}
+
+// 按 series 分组：有 series 的归入合集，合集内部按阶段分子组
 const grouped = computed(() => {
   const seriesMap = new Map<string, Post[]>()
   const standalonePosts: Post[] = []
@@ -46,13 +60,26 @@ const grouped = computed(() => {
     }
   }
 
-  // 合集按 seriesOrder 排序，单帖按日期排序
   const collectionList: Collection[] = []
   for (const [title, seriesPosts] of seriesMap) {
     seriesPosts.sort((a, b) => (a.seriesOrder || 0) - (b.seriesOrder || 0))
+
+    // 按阶段分组
+    const stageMap = new Map<string, Post[]>()
+    for (const p of seriesPosts) {
+      const stage = getStage(p.seriesOrder || 0)
+      if (!stageMap.has(stage)) stageMap.set(stage, [])
+      stageMap.get(stage)!.push(p)
+    }
+    const stages: StageGroup[] = []
+    for (const [name, stagePosts] of stageMap) {
+      stages.push({ name, posts: stagePosts })
+    }
+
     collectionList.push({
       title,
       posts: seriesPosts,
+      stages,
       latestDate: seriesPosts.reduce((max, p) => p.date > max ? p.date : max, ''),
     })
   }
@@ -82,27 +109,38 @@ function shortExcerpt(text: string, len = 80) {
         <span class="collection-title">{{ col.title }}</span>
         <span class="collection-count">{{ col.posts.length }} 篇</span>
       </div>
-      <div class="collection-posts">
-        <a
-          v-for="p in isExpanded(col.title) ? col.posts : col.posts.slice(0, COLLECTION_PREVIEW)"
-          :key="p.url"
-          :href="withBase(p.url)"
-          class="collection-post-item"
+
+      <!-- 内容区，折叠时限制高度 -->
+      <div :class="['collection-body', { 'is-collapsed': !isExpanded(col.title) }]">
+        <div
+          v-for="stage in col.stages"
+          :key="stage.name"
+          class="stage-group"
         >
-          <span class="cp-order">{{ p.seriesOrder }}</span>
-          <div class="cp-content">
-            <span class="cp-title">{{ p.title }}</span>
-            <span class="cp-excerpt">{{ shortExcerpt(p.excerpt, 60) }}</span>
+          <div class="stage-header">{{ stage.name }} <span class="stage-count">{{ stage.posts.length }} 篇</span></div>
+          <div class="collection-posts">
+            <a
+              v-for="p in isExpanded(col.title) ? stage.posts : stage.posts.slice(0, Math.ceil(PREVIEW_COUNT / col.stages.length))"
+              :key="p.url"
+              :href="withBase(p.url)"
+              class="collection-post-item"
+            >
+              <span class="cp-order">{{ p.seriesOrder }}</span>
+              <div class="cp-content">
+                <span class="cp-title">{{ p.title }}</span>
+                <span class="cp-excerpt">{{ shortExcerpt(p.excerpt, 60) }}</span>
+              </div>
+              <span class="cp-date">{{ p.date }}</span>
+            </a>
           </div>
-          <span class="cp-date">{{ p.date }}</span>
-        </a>
+        </div>
       </div>
-      <div
-        v-if="col.posts.length > COLLECTION_PREVIEW"
-        class="collection-toggle"
-        @click="toggleExpand(col.title)"
-      >
-        {{ isExpanded(col.title) ? '收起' : `展开剩余 ${col.posts.length - COLLECTION_PREVIEW} 篇` }}
+
+      <div class="collection-toggle-wrap">
+        <button class="collection-toggle-btn" @click="toggleExpand(col.title)">
+          <span v-if="!isExpanded(col.title)">展开全部 {{ col.posts.length }} 篇</span>
+          <span v-else>收起</span>
+        </button>
       </div>
     </div>
 
@@ -124,7 +162,7 @@ function shortExcerpt(text: string, len = 80) {
 /* ===== 布局 ===== */
 .post-feed {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 24px;
   margin-top: 32px;
   align-items: start;
@@ -136,6 +174,8 @@ function shortExcerpt(text: string, len = 80) {
   border-radius: 14px;
   background: var(--vp-c-bg-soft);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   transition: border-color 0.25s, box-shadow 0.25s;
 }
 
@@ -151,6 +191,7 @@ function shortExcerpt(text: string, len = 80) {
   padding: 18px 20px 14px;
   border-bottom: 1px solid var(--vp-c-divider);
   background: var(--vp-c-bg);
+  flex-shrink: 0;
 }
 
 .collection-icon {
@@ -172,6 +213,40 @@ function shortExcerpt(text: string, len = 80) {
   border-radius: 10px;
 }
 
+/* 内容区 */
+.collection-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.collection-body.is-collapsed {
+  max-height: 200px;
+  overflow: hidden;
+}
+
+/* 阶段子分组 */
+.stage-group {
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.stage-group:last-child {
+  border-bottom: none;
+}
+
+.stage-header {
+  padding: 10px 20px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vp-c-text-2);
+  background: var(--vp-c-bg);
+}
+
+.stage-count {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--vp-c-text-3);
+}
+
 /* 合集内小帖子 */
 .collection-posts {
   padding: 6px 0;
@@ -181,7 +256,7 @@ function shortExcerpt(text: string, len = 80) {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 12px 20px;
+  padding: 10px 20px;
   text-decoration: none;
   color: inherit;
   transition: background 0.15s;
@@ -245,18 +320,30 @@ function shortExcerpt(text: string, len = 80) {
 }
 
 /* 展开/收起按钮 */
-.collection-toggle {
-  padding: 10px 20px;
+.collection-toggle-wrap {
+  padding: 12px 20px;
   text-align: center;
-  font-size: 13px;
-  color: var(--vp-c-brand);
-  cursor: pointer;
   border-top: 1px solid var(--vp-c-divider);
-  transition: background 0.15s;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
-.collection-toggle:hover {
-  background: var(--vp-c-bg);
+.collection-toggle-btn {
+  display: inline-block;
+  padding: 6px 24px;
+  font-size: 13px;
+  color: var(--vp-c-brand);
+  background: transparent;
+  border: 1px solid var(--vp-c-brand);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.collection-toggle-btn:hover {
+  background: var(--vp-c-brand);
+  color: #fff;
 }
 
 /* ===== 独立单帖卡片 ===== */

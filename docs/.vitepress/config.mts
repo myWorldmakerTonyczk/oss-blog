@@ -49,9 +49,18 @@ export default defineConfig({
     sidebar: {
       '/posts/': (() => {
         const { series, standalone } = getPosts()
+
+        // 根据 seriesOrder 自动划分阶段
+        function getStage(order: number): string {
+          if (order <= 18) return '第一阶段：Agent Core'
+          if (order <= 22) return '第二阶段：Memory & Knowledge'
+          if (order <= 28) return '第三阶段：Infrastructure'
+          return '第四阶段：Multi-Agent'
+        }
+
         const items: any[] = []
 
-        // 按 series 字段分组，每个合集一个折叠分组
+        // 按 series 字段分组
         const seriesGroups = new Map<string, PostMeta[]>()
         for (const p of series) {
           const name = p.series!
@@ -59,11 +68,26 @@ export default defineConfig({
           seriesGroups.get(name)!.push(p)
         }
         for (const [seriesName, seriesPosts] of seriesGroups) {
-          items.push({
+          // 在每个 series 内部按 stage 分子分组
+          const stageGroups = new Map<string, PostMeta[]>()
+          for (const p of seriesPosts) {
+            const stage = getStage(p.seriesOrder || 0)
+            if (!stageGroups.has(stage)) stageGroups.set(stage, [])
+            stageGroups.get(stage)!.push(p)
+          }
+          const seriesItem: any = {
             text: seriesName,
-            collapsed: false,
-            items: seriesPosts.map(p => ({ text: p.text, link: p.link })),
-          })
+            collapsed: true,
+            items: [] as any[],
+          }
+          for (const [stageName, stagePosts] of stageGroups) {
+            seriesItem.items.push({
+              text: stageName,
+              collapsed: true,
+              items: stagePosts.map(p => ({ text: p.text, link: p.link })),
+            })
+          }
+          items.push(seriesItem)
         }
         // 非合集帖子
         if (standalone.length) {
